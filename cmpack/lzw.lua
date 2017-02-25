@@ -1,17 +1,7 @@
 local lzw = {}
 
 local function hex(num)
-  local hextable = {'1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
-  hextable[0] = '0'
-  local hex = ''
-  local q = num
-  repeat
-    local i,f = math.modf(q/16)
-    hex = hextable[16 * f] .. hex
-    q = i
-  until q < 16
-  hex = hextable[q] .. hex
-  return hex
+  return string.format("%02x",num):upper()
 end
 local function num(hex)
   return tonumber(hex,16)
@@ -150,6 +140,24 @@ function lzw.decompress(data, print)
     previous = str
   end
   return out_buffer
+end
+
+function lzw.pcompress(data,csize,print)
+  csize = csize or 4096
+  local retval = ""
+  for i = 1, #data, csize do
+    local tmp = lzw.compress(data:sub(i,i + csize - 1),print)
+    local th = "0000" local tsz = th:sub(1,4-#hex(#tmp)) .. hex(#tmp)
+    print(tsz)
+    local sz = ""
+    for i=1,4,2 do sz = sz .. hexchar(tsz:sub(i,i+1)) end
+    retval = retval .. sz .. tmp
+  end
+  return retval
+end
+function lzw.pdecompress(data,print)
+  local retval = ""
+  
 end
 
 return lzw
