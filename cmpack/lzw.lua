@@ -148,16 +148,26 @@ function lzw.pcompress(data,csize,print)
   for i = 1, #data, csize do
     local tmp = lzw.compress(data:sub(i,i + csize - 1),print)
     local th = "0000" local tsz = th:sub(1,4-#hex(#tmp)) .. hex(#tmp)
-    print(tsz)
     local sz = ""
     for i=1,4,2 do sz = sz .. hexchar(tsz:sub(i,i+1)) end
     retval = retval .. sz .. tmp
   end
-  return retval
+  return retval .. hexchar("00") .. hexchar("00")
 end
 function lzw.pdecompress(data,print)
   local retval = ""
-  
+  local pos = 1
+  local size = 0
+  local tmp = ""
+  while pos < #data do
+    size = tonumber(data:sub(pos,pos+1):gsub(".",function (c) return string.format("%02x",string.byte(c)) end),16)
+    if size == 0 then break end
+    pos = pos + 2
+    tmp = data:sub(pos,pos+size-1)
+    pos = pos + size
+    retval = retval .. lzw.decompress(tmp,print)
+  end
+  return retval
 end
 
 return lzw

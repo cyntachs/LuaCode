@@ -35,9 +35,8 @@ end
 function serialize.lserialize(o,depth)
   local function ser(o,depth,ind)
     ind = ind or 1
-    depth = depth or 20
+    depth = depth or 10
     depth = depth - 1
-    if depth <= 0 then return '' end
     local indn = 0
     local indent = ''
     while indn < ind do
@@ -52,6 +51,7 @@ function serialize.lserialize(o,depth)
     elseif type(o) == "string" then
       retstr = retstr .. string.format("%q", o) .. ''
     elseif type(o) == "table" then
+      if depth <= 0 then return '<'..type(o)..'>' end
       retstr = retstr .. '{\n'
       for k,v in pairs(o) do
         retstr = retstr .. indent .. '' .. k .. '='
