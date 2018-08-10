@@ -9,27 +9,27 @@ local function hexchar(hex) -- range of 0-255 only
 end
 
 
-local function permtobytes(r,w,x)
+local function permtobytes(u,g,p)
   -- convert permission number to chars (2 bytes)
-  if (r > 7) or (r < 0) then r = 7 end
-  if (w > 7) or (w < 0) then w = 7 end
-  if (x > 7) or (x < 0) then x = 7 end
-  rw_byte = hex( r + (w*16) )
-  x_byte = hex(x)
-  return hexchar(rw_byte)..hexchar(x_byte)
+  if (u > 7) or (u < 0) then r = 7 end
+  if (g > 7) or (g < 0) then w = 7 end
+  if (p > 7) or (p < 0) then x = 7 end
+  ug_byte = hex( u + (g*16) )
+  p_byte = hex(p)
+  return hexchar(ug_byte)..hexchar(p_byte)
 end
 
 local function bytestoperm(perm)
   -- convert 2 bytes to permission numbers
-  rw_byte = hex(string.byte(perm:sub(1,1)))
-  r_perm = tonumber(rw_byte:sub(2,2))
-  w_perm = tonumber(rw_byte:sub(1,1))
-  x_perm = tonumber(string.byte(perm:sub(2,2)))
-  return r_perm,w_perm,x_perm
+  ug_byte = hex(string.byte(perm:sub(1,1)))
+  u_perm = tonumber(ug_byte:sub(2,2))
+  g_perm = tonumber(ug_byte:sub(1,1))
+  p_perm = tonumber(string.byte(perm:sub(2,2)))
+  return u_perm,g_perm,p_perm
 end
 
-r,w,x = 7,6,5
+u,g,p = 7,6,5
 
-print(permtobytes(r,w,x))
-print(bytestoperm(permtobytes(r,w,x)))
-print(permtobytes(bytestoperm(permtobytes(r,w,x))))
+print(permtobytes(u,g,p))
+print(bytestoperm(permtobytes(u,g,p)))
+print(permtobytes(bytestoperm(permtobytes(u,g,p))))
