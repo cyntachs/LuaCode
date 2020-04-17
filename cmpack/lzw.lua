@@ -1,17 +1,24 @@
-local lzw = {}
+local lzw = {print = (function () end)}
 
-local function hex(num)
-  return string.format("%02x",num):upper()
-end
-local function num(hex)
-  return tonumber(hex,16)
-end
-local function hexchar(hex)
-  return string.char(num(hex))
+local function hex(num) return string.format("%02x",num):upper() end
+local function num(hex) return tonumber(hex,16) end
+local function hex2char(hex) return string.char(num(hex)) end
+local function char2hex(chr) return hex(string.byte(chr)) end
+local function int2char(num) return string.char(num) end
+local function char2int(chr) return string.byte(chr) end
+
+local prevPr = 0
+local function progress(c,t)
+  local Pr = math.floor( (c/t)*100 )
+  if Pr ~= prevPr and Pr%5 <= 0 then
+    lzw.print(Pr)
+    prevPr = Pr
+  end
 end
 
-function lzw.compress(data, print)
-  print = print or (function () end)
+function lzw.PrintFn(print) lzw.print = print end
+
+function lzw.compress(data)
   -- dictionary variables
   local dictionary = {}
   local dictionary_len = 0
@@ -19,7 +26,7 @@ function lzw.compress(data, print)
   local high_len = 1
   -- initialize dictionary
   for i = 1, 255 do
-    dictionary[string.char(i)] = hex(#(hex(i))):sub(2,2) .. hex(i) -- [key size][key]
+    dictionary[int2char(i)] = hex(#(hex(i))):sub(2,2) .. hex(i) -- [key size][key]
     dictionary_len = i
   end
   -- encode
@@ -39,9 +46,7 @@ function lzw.compress(data, print)
     until blocklen == -1
     if blocklen == -1 then error('dictionary error') end
     -- convert
-    if ((pos/(#data))*100)%5 <= 0.002 then -- progress
-      print( math.floor((pos/(#data))*100) )
-    end
+    progress(pos, #data) -- progress
     out_buffer = out_buffer .. dictionary[block]
     pos = pos + blocklen
     -- add new entries to dictionary
@@ -56,7 +61,7 @@ function lzw.compress(data, print)
       out_buffer = '-'.. out_buffer
       local t = ''
       for i = 1, (#out_buffer/2) do
-        t = t .. hexchar(out_buffer:sub(i*2,(i*2)+1))
+        t = t .. hex2char(out_buffer:sub(i*2,(i*2)+1))
       end
       encoded = encoded .. t
       out_buffer = ''
@@ -70,7 +75,7 @@ function lzw.compress(data, print)
     until (#out_buffer%2) == 0
     out_buffer = '-'..out_buffer
     for i = 1, (#out_buffer/2) do
-      retval = retval .. hexchar(out_buffer:sub(i*2,(i*2)+1))
+      retval = retval .. hex2char(out_buffer:sub(i*2,(i*2)+1))
     end
     retval = encoded .. retval
   else
@@ -79,22 +84,21 @@ function lzw.compress(data, print)
   return retval
 end
 
-function lzw.decompress(data, print)
-  print = print or (function() end)
+function lzw.decompress(data)
   -- dictionary variables
   local dictionary = {}
   local dictionary_len = 0
   local high_len = 1
   -- initialize dictionary
   for i = 1, 255 do
-    dictionary[hex(i)] = string.char(i)
+    dictionary[hex(i)] = int2char(i)
     dictionary_len = i
   end
   -- char to hex conversion of first 32 chars
   local hexstr = ''
   local rawpos = 1
   for i = 1, 32 do
-    local ht = hex(string.byte(data:sub(rawpos,rawpos)))
+    local ht = char2hex(data:sub(rawpos,rawpos))
     hexstr = hexstr .. ht
     rawpos = rawpos + 1
   end
@@ -112,7 +116,7 @@ function lzw.decompress(data, print)
       local new = ''
       for i = 1, keysize+1 do
         if rawpos > #data then break end
-        new = new .. hex(string.byte(data:sub(rawpos,rawpos)))
+        new = new .. char2hex(data:sub(rawpos,rawpos))
         rawpos = rawpos + 1
       end
       hexstr = hexstr .. new
@@ -127,9 +131,7 @@ function lzw.decompress(data, print)
       str = previous .. previous:sub(1,1)
     end
     out_buffer = out_buffer .. str
-    if ((pos/(#data*2))*100)%5 <= 0.002 then
-      print( math.floor((pos/(#data*2))*100) )
-    end
+    progress(rawpos, #data) -- progress
     -- add to dictionary
     if previous ~= '' then
       local newentry = previous .. str:sub(1,1)
@@ -142,30 +144,31 @@ function lzw.decompress(data, print)
   return out_buffer
 end
 
-function lzw.pcompress(data,csize,print)
-  csize = csize or 4096
+function lzw.pcompress(data,csize)
+  csize = csize or 16384
   local retval = ""
   for i = 1, #data, csize do
-    local tmp = lzw.compress(data:sub(i,i + csize - 1),print)
-    local th = "0000" local tsz = th:sub(1,4-#hex(#tmp)) .. hex(#tmp)
+    local tmp = lzw.compress(data:sub(i,i + csize - 1))
+    local tsz = ("0000"):sub(1,4-#hex(#tmp)) .. hex(#tmp)
     local sz = ""
-    for i=1,4,2 do sz = sz .. hexchar(tsz:sub(i,i+1)) end
+    for i=1,4,2 do sz = sz .. hex2char(tsz:sub(i,i+1)) end
     retval = retval .. sz .. tmp
   end
-  return retval .. hexchar("00") .. hexchar("00")
+  lzw.print('Ratio: '..#retval/#data)
+  return retval .. hex2char("00") .. hex2char("00")
 end
-function lzw.pdecompress(data,print)
+function lzw.pdecompress(data)
   local retval = ""
   local pos = 1
   local size = 0
   local tmp = ""
   while pos < #data do
-    size = tonumber(data:sub(pos,pos+1):gsub(".",function (c) return string.format("%02x",string.byte(c)) end),16)
+    size = num(data:sub(pos,pos+1):gsub(".",function (c) return char2hex(c) end))
     if size == 0 then break end
     pos = pos + 2
     tmp = data:sub(pos,pos+size-1)
     pos = pos + size
-    retval = retval .. lzw.decompress(tmp,print)
+    retval = retval .. lzw.decompress(tmp)
   end
   return retval
 end
